@@ -50,13 +50,16 @@
 			}
 		{{ end }}
 		{{- range $e := $n.Edges }}
-			{{- range $op := edgeOperations $e }}
-				{{- if or (isRead $op) (isList $op) }}
-					{{- $opID := print ($op | toString | pascal) $n.Name ($e.Name | pascal) }}
-					// {{ $opID }} handles {{ httpVerb $op }} {{ printf "%s/{id}/%s" $root ($e.Name | kebab) }} requests.
-					func (h *OgentHandler) {{ $opID }}(ctx context.Context, params {{ $opID }}Params) ({{ $opID }}Res, error) {
-						{{- xtemplate (printf "ogent/ogent/helper/%s/sub" $op) (extend $n "Edge" $e) -}}
-					}
+			{{- $a := edgeAnnotation $e }}
+			{{- if not $a.Skip }}
+				{{- range $op := edgeOperations $e }}
+					{{- if or (isRead $op) (isList $op) }}
+						{{- $opID := print ($op | toString | pascal) $n.Name ($e.Name | pascal) }}
+						// {{ $opID }} handles {{ httpVerb $op }} {{ printf "%s/{id}/%s" $root ($e.Name | kebab) }} requests.
+						func (h *OgentHandler) {{ $opID }}(ctx context.Context, params {{ $opID }}Params) ({{ $opID }}Res, error) {
+							{{- xtemplate (printf "ogent/ogent/helper/%s/sub" $op) (extend $n "Edge" $e) -}}
+						}
+					{{ end }}
 				{{ end }}
 			{{ end }}
 		{{ end }}
