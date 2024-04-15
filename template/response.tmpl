@@ -14,7 +14,10 @@ import "{{ $.Config.Package }}"
 		}
 		var ret {{ $n }}
 		{{- range $f := $v.Fields }}
-			{{ setFieldExpr $f $n "ret" "e" }}
+			{{- $a := fieldAnnotation $f }}
+			{{- if or (not $a) (not $a.Skip) }}
+				{{ setFieldExpr $f $n "ret" "e" }}
+			{{- end }}
 		{{- end }}
 		{{- range $e := $v.Edges }}
 			{{- $vn := replaceAll (viewNameEdge $n $e) "_" "" }}
