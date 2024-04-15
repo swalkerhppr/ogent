@@ -25,6 +25,7 @@ var (
 		"edgeOperations":  entoas.EdgeOperations,
 		"edgeViewName":    entoas.EdgeViewName,
 		"fieldAnnotation": entoas.FieldAnnotation,
+		"edgeAnnotation":  entoas.EdgeAnnotation,
 		"hasParams":       hasParams,
 		"hasRequestBody":  hasRequestBody,
 		"httpRoute":       httpRoute,

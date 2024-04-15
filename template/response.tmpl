@@ -20,13 +20,16 @@ import "{{ $.Config.Package }}"
 			{{- end }}
 		{{- end }}
 		{{- range $e := $v.Edges }}
-			{{- $vn := replaceAll (viewNameEdge $n $e) "_" "" }}
-			ret.{{ $e.StructField }}= New{{ if $e.Unique -}}
-				{{ $vn }}
-			{{- else -}}
-				{{ $vn | plural }}
-			{{- end }}(e.Edges.{{ $e.StructField }})
-			{{- if not $e.Optional}}.Elem(){{ end }}
+			{{- $a := edgeAnnotation $e }}
+			{{- if not $a.Skip }}
+				{{- $vn := replaceAll (viewNameEdge $n $e) "_" "" }}
+				ret.{{ $e.StructField }}= New{{ if $e.Unique -}}
+					{{ $vn }}
+				{{- else -}}
+					{{ $vn | plural }}
+				{{- end }}(e.Edges.{{ $e.StructField }})
+				{{- if not $e.Optional}}.Elem(){{ end }}
+			{{- end }}
 		{{- end }}
 		return &ret
 	}
