@@ -24,7 +24,7 @@
 				{{ if $f.IsEnum -}}
 					b.Set{{ $f.StructField }}({{ $f.Type.String }}(req.{{ $f | ogenStructField }}))
 				{{- else -}}
-					b.Set{{ $f.StructField }}(req.{{ $f | ogenStructField | ogenToEnt $f }})
+					b.Set{{ $f.StructField }}({{ $f | ogenStructField | print "req." | ogenToEnt $f }})
 				{{- end }}
 			{{- end }}
 		{{- end }}
