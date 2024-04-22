@@ -7,11 +7,11 @@
 		{{- $a := fieldAnnotation $f }}
 		{{- if and (not $f.Immutable) (or (not $a) (not (or $a.ReadOnly $a.Skip))) }}
 			{{- if $f.IsBytes }}
-				if req.{{ $f.StructField }} != nil {
-					b.Set{{ $f.StructField }}(req.{{ $f.StructField }})
+				if req.{{ $f | ogenStructField }} != nil {
+					b.Set{{ $f.StructField }}(req.{{ $f | ogenStructField }})
 				}
 			{{- else }}
-				if v, ok := req.{{ $f.StructField}}.Get(); ok {
+				if v, ok := req.{{ $f | ogenStructField}}.Get(); ok {
 					{{- $x := "v" }}
 					{{- if $f.IsEnum -}}
 						{{ $x = convertTo $f.Type.String $x }}

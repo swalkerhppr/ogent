@@ -42,6 +42,7 @@ var (
 		"setFieldExpr":    setFieldExpr,
 		"viewName":        entoas.ViewName,
 		"viewNameEdge":    entoas.ViewNameEdge,
+		"ogenStructField": ogenStructField,
 	}
 	// templates holds all templates used by ogent.
 	templates = gen.MustParse(gen.NewTemplate("ogent").Funcs(funcMap).ParseFS(templateDir, "template/*tmpl"))
@@ -182,27 +183,31 @@ const (
 
 // setFieldExpr returns a Go expression to set the field on a response.
 func setFieldExpr(f *gen.Field, schema, rec, ident string) (string, error) {
-	if !f.Optional && !f.Nillable {
-		expr := fmt.Sprintf("%s.%s", ident, f.StructField())
-		if f.IsEnum() {
-			expr = convertTo(schema+f.StructField(), expr)
-		}
-		expr = entToOgen(f, expr)
-		return fmt.Sprintf("%s.%s = %s", rec, f.StructField(), expr), nil
+	var rhs, lhs string
+	rhs = fmt.Sprintf("%s.%s", ident, f.StructField())
+	lhs = fmt.Sprintf("%s.%s", rec, ogenStructField(f))
+
+	if f.IsEnum() {
+		rhs = convertTo(schema+f.StructField(), rhs)
 	}
+
+	if !f.Optional && !f.Nillable {
+		return fmt.Sprintf("%s = %s", lhs, castValues(f, rhs)), nil
+	}
+
 	t, err := entoas.OgenSchema(f)
 	if err != nil {
 		return "", err
 	}
-	buf := new(strings.Builder)
+
 	// Enums need special handling.
 	if f.IsEnum() {
-		fmt.Fprintf(buf, "NewOpt%s%s(%s)",
+		return fmt.Sprintf("NewOpt%s%s(%s)",
 			schema, f.StructField(),
-			convertTo(schema+f.StructField(), fmt.Sprintf("%s.%s", ident, f.StructField())),
-		)
-		return buf.String(), nil
+			convertTo(schema + f.StructField(), rhs),
+		), nil
 	}
+
 	var opt string
 	switch t.Type {
 	case Integer:
@@ -216,6 +221,7 @@ func setFieldExpr(f *gen.Field, schema, rec, ident string) (string, error) {
 		default:
 			return "", fmt.Errorf("unexpected type: %q", t.Format)
 		}
+
 	case Number:
 		switch t.Format {
 		case Float:
@@ -229,10 +235,11 @@ func setFieldExpr(f *gen.Field, schema, rec, ident string) (string, error) {
 		default:
 			return "", fmt.Errorf("unexpected type: %q", t.Format)
 		}
+
 	case String:
 		switch t.Format {
 		case Byte:
-			return fmt.Sprintf("%s.%s = %s.%s", rec, f.StructField(), ident, f.StructField()), nil
+			return fmt.Sprintf("%s = %s", lhs, rhs), nil
 		case DateTime:
 			opt = "DateTime"
 		case Date:
@@ -252,6 +259,7 @@ func setFieldExpr(f *gen.Field, schema, rec, ident string) (string, error) {
 		default:
 			return "", fmt.Errorf("unexpected type: %q", t.Format)
 		}
+
 	case Boolean:
 		switch t.Format {
 		case None:
@@ -259,21 +267,16 @@ func setFieldExpr(f *gen.Field, schema, rec, ident string) (string, error) {
 		default:
 			return "", fmt.Errorf("unexpected type: %q", t.Format)
 		}
+
 	default:
 		return "", fmt.Errorf("unexpected type: %q", t.Format)
 	}
+
 	if f.Nillable {
-		fmt.Fprintf(buf, "%s.%s = Opt%s{}\n", rec, f.StructField(), opt)
-		fmt.Fprintf(buf, "if %s.%s != nil { %s.%s.SetTo(*%s.%s) }",
-			ident, f.StructField(),
-			rec, f.StructField(),
-			ident, f.StructField(),
-		)
-	} else {
-		expr := entToOgen(f, fmt.Sprintf("%s.%s", ident, f.StructField()))
-		fmt.Fprintf(buf, "%s.%s = NewOpt%s(%s)", rec, f.StructField(), opt, expr)
-	}
-	return buf.String(), nil
+		return fmt.Sprintf( "%s = Opt%s{}\nif %s != nil { %s.SetTo(*%s) }", lhs, opt, rhs, lhs, rhs ), nil
+	} 
+
+	return fmt.Sprintf( "%s = NewOpt%s(%s)", lhs, opt, castValues(f, rhs)), nil
 }
 
 func convertTo(typ, expr string) string {
@@ -301,7 +304,7 @@ func ogenToEnt(f *gen.Field, expr string) string {
 	}
 }
 
-func entToOgen(f *gen.Field, expr string) string {
+func castValues(f *gen.Field, expr string) string {
 	switch f.Type.Type {
 	case field.TypeInt8, field.TypeUint8,
 		field.TypeInt16, field.TypeUint16:
@@ -311,4 +314,40 @@ func entToOgen(f *gen.Field, expr string) string {
 	default:
 		return expr
 	}
+}
+
+// From Ogen 
+var (
+	rules = [...]string{
+		"ACL", "API", "ASCII", "AWS", "CPU", "CSS", "DNS", "EOF", "GB", "GUID",
+		"HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "KB", "LHS", "MAC", "MB",
+		"QPS", "RAM", "RHS", "RPC", "SLA", "SMTP", "SQL", "SSH", "SSO", "TLS",
+		"TTL", "UI", "UID", "URI", "URL", "UTF8", "UUID", "VM", "XML", "XMPP",
+		"XSRF", "XSS", "SMS", "CDN", "TCP", "UDP", "DC", "PFS", "P2P",
+		"SHA256", "SHA1", "MD5", "SRP", "2FA", "OAuth", "OAuth2",
+
+		"PNG", "JPG", "GIF", "MP4", "WEBP",
+	}
+	// rulesMap is a map of lowered rules to their canonical form.
+	rulesMap = func() (r map[string]string) {
+		r = make(map[string]string)
+		for _, v := range rules {
+			r[strings.ToLower(v)] = v
+		}
+		return r
+	}()
+)
+
+func ogenStructField(f *gen.Field) string {
+	parts := strings.Split(f.Name, "_")
+	result := ""
+	for _, p := range parts {
+		r, ok := rulesMap[strings.ToLower(p)]
+		if ok {
+			result += r
+		} else {
+			result += strcase.UpperCamelCase(p)
+		}
+	}
+	return result
 }

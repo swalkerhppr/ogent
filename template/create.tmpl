@@ -6,11 +6,11 @@
 		{{- if or (not $a) (not (or $a.ReadOnly $a.Skip)) }}
 			{{- if $f.Optional }}
 				{{- if or $f.IsBytes }}
-					if req.{{ $f.StructField }} != nil {
-						b.Set{{ $f.StructField }}(req.{{ $f.StructField }})
+					if req.{{ $f | ogenStructField }} != nil {
+						b.Set{{ $f.StructField }}(req.{{ $f | ogenStructField }})
 					}
 				{{- else }}
-					if v, ok := req.{{ $f.StructField}}.Get(); ok {
+					if v, ok := req.{{ $f | ogenStructField}}.Get(); ok {
 						{{- $x := "v" }}
 						{{- if $f.IsEnum -}}
 							{{ $x = convertTo $f.Type.String $x }}
@@ -21,13 +21,11 @@
 					}
 				{{- end }}
 			{{- else }}
-				{{- $x := print "req." $f.StructField }}
-				{{- if $f.IsEnum -}}
-					{{ $x = convertTo $f.Type.String $x }}
+				{{ if $f.IsEnum -}}
+					b.Set{{ $f.StructField }}({{ $f.Type.String }}(req.{{ $f | ogenStructField }}))
 				{{- else -}}
-					{{ $x = ogenToEnt $f $x }}
+					b.Set{{ $f.StructField }}(req.{{ $f | ogenStructField | ogenToEnt $f }})
 				{{- end }}
-				b.Set{{ $f.StructField }}({{ $x }})
 			{{- end }}
 		{{- end }}
 	{{- end }}
